@@ -1,46 +1,29 @@
+// stores token address, user balances and total liquidity
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-interface IERC20 {
-    function transferFrom(address from, address to, uint amount) external returns (bool);
-    function transfer(address to, uint amount) external returns (bool);
-    function balanceOf(address account) external view returns (uint);
-}
+import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 contract Vault {
 
     address public token;
-    address public owner;
-    uint public totalDeposited;
+    address public factory;
 
-    mapping(address => uint) public deposits;
+    mapping(address => uint256) public deposits;
 
-    event DepositSuccessful(address indexed sender, uint256 indexed amount);
+    uint256 public totalDeposits;
 
-    constructor(address _token, address _owner) {
+    constructor(address _token, address _creator) {
         token = _token;
-        owner = _owner;
+        factory = _creator;
     }
 
     function deposit(uint256 amount) external {
+
         IERC20(token).transferFrom(msg.sender, address(this), amount);
+
         deposits[msg.sender] += amount;
 
-        totalDeposited += amount;
-
-        emit DepositSuccessful(msg.sender, amount);
-
+        totalDeposits += amount;
     }
-
-    function withdraw(uint amount) external {
-
-        require(deposits[msg.sender] >= amount,"not enough token");
-
-        deposits[msg.sender] -= amount;
-
-        IERC20(token).transfer(msg.sender,amount);
-
-        totalDeposited -= amount;
-    }
-
 }

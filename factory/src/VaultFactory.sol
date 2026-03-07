@@ -1,39 +1,65 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
-import "./Vault.sol";
 
-contract VaultFactory{
-   mapping(address => address) public tokenVault;
+import "./Vault.sol";
+import "./VaultNFT.sol";
+import "openzeppelin-contracts/contracts/utils/Strings.sol";
+
+contract VaultFactory {
+
+    using Strings for uint256;
+
+    mapping(address => address) public vaults;
+    VaultNFT public nft;
 
     event VaultCreated(address token, address vault);
+    event NFTUpdated(uint256 tokenId, string metadata);
 
-    function createVault(address token) external returns (address vault){
-        require(tokenVault[token] == address(0), "Vault already exists");
-
-        bytes32 salt = keccak256(abi.encodePacked(token));
-
-        vault = address(new Vault{salt: salt}(token, msg.sender));
-
-        tokenVault[token] = vault;
-
-        emit VaultCreated(token, vault);
+    constructor(address _nft) {
+        nft = VaultNFT(_nft);
     }
 
-    function deposit(address token,uint amount) external {
+    function createVault(address token) external returns (address) {
+        require(vaults[token] == address(0), "Vault exists");
 
-        address vault = tokenVault[token];
+        bytes32 salt = keccak256(abi.encode(token));
 
-        if(vault == address(0)){
+        Vault vault = new Vault{salt: salt}(token, msg.sender);
 
-            bytes32 salt = keccak256(abi.encodePacked(token));
+        vaults[token] = address(vault);
 
-            vault = address(new Vault{salt:salt}(token,msg.sender));
+        emit VaultCreated(token, address(vault));
 
-            tokenVault[token] = vault;
-        }
-
-        IERC20(token).transferFrom(msg.sender,vault,amount);
-
-        Vault(vault).deposit(amount);
+        return address(vault);
     }
+
+    /// @notice Called after deposit to mint NFT with actual deposit amount
+    function mintVaultNFT(
+        address vaultAddress,
+        address token,
+        uint256 amount
+    ) external returns (uint256) {
+
+        require(vaults[token] == vaultAddress, "Vault not found");
+
+        string memory metadata = string(
+            abi.encodePacked(
+                "Token: USDC | Deposit: ",
+                amount.toString(),
+                " | Vault: ",
+                Strings.toHexString(uint160(vaultAddress), 20)
+            )
+        );
+
+        uint256 id = nft.mint(msg.sender, metadata);
+
+        emit NFTUpdated(id, metadata);
+
+        return id;
+    }
+
+    function getVault(address token) external view returns (address) {
+        return vaults[token];
+    }
+
 }
